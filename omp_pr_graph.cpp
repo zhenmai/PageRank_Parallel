@@ -160,7 +160,7 @@ void PageRank(Algorithm_Graph *graph)
 
         // Calculate the total pagerank value by adding the pr[p]← 1-d/N + pr_dangling/N
         #pragma omp parallel for
-        for (int i = 0; i < num_v; ++i)
+        for (unsigned i = 0; i < num_v; ++i)
         {
             graph->nodes[i].pagerank += pr_random + pr_dangling;
         }
@@ -174,7 +174,7 @@ void PageRank(Algorithm_Graph *graph)
     }
 }
 
-void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const unsigned loop_t)
+void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const int loop_t)
 {
     auto const avg_time = std::chrono::duration_cast<std::chrono::microseconds>( end_t - start_t ).count() / double(loop_t);
     std::cout << "Average total running time  = " << avg_time << " us" << std::endl;
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
         {
             Algorithm_Graph graph(num_vertices, input);
             auto const start_time = std::chrono::steady_clock::now();
-            for (unsigned i = 0; i < loop_times; i++)
+            for (int i = 0; i < loop_times; i++)
             {
                 PageRank(&graph);
             }
