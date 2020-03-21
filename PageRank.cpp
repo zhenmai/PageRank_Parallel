@@ -2,7 +2,6 @@
 #include <fstream> // std::ifstream
 #include <sstream> // std::stringstream
 #include <string> // std::string, std::stoi
-#include <limits.h> // UINT_MAX
 #include <cstring> // std::strcmp
 #include <cmath>
 #include <vector>
@@ -10,81 +9,52 @@
 #include <ctime>
 #include "Graph.hpp"
 
-using namespace CSC586C::original_graph;
+using namespace CSC586C::baseline_graph;
 
 extern const double damping_factor = 0.85;
 extern const unsigned max_iterations = 100;
-extern const double tolerance = 1e-8;
+extern const double tolerance = 1e-10;
 
-// Read Input from file with format:
-// N (#vertex)
-// src_index dest_index ... src_index dest_index (pairs of source and destination links)
+// Read Input (pairs of source and destination links) from file with format:
+// src_index dest_index
+// ... 
+// src_index dest_index 
 std::vector<Edge> ReadInputFromTextFile(const char* input_file, unsigned& num_vertices)
 {
-    std::vector<Edge> input;
-    std::string input_line, str;
     std::ifstream myfile (input_file);
-    if (myfile.is_open())
+    std::vector<Edge> edges;
+    if (myfile.is_open()) 
     {
-        while (getline(myfile,input_line))
-        {
-           if (input_line.size() < std::to_string(UINT_MAX).size())
-           {
-                // Record the number of vertexes
-               num_vertices = std::stoi(input_line);
-               // std::cout << input_line << std::endl;
-           } 
-           else
-           {
-                std::stringstream temp_line(input_line);
-                unsigned source = 0;
-                unsigned destination = 0;
-                unsigned count = 0;
-                while (getline(temp_line, str, ' '))
-                {
-                    ++count;
-                    unsigned temp_value = std::stoi(str);
-                    if (count == 1)
-                    {
-                        source = temp_value;
-                    }
-                    else if (count == 2)
-                    {
-                        count = 0;
-                        destination = temp_value;
-                        // Writing out the edges into the graph
-                        // Example: std::vector<Edge> input{ Edge{1,0}, Edge{4,2}, Edge{2,5}, Edge{1,3}};
-                        if (source == destination) break; 
-                        input.push_back(Edge{source, destination});  
-                        // std::cout << source << std::endl;
-                        // std::cout << destination << std::endl;
-                    }
-                }
-           }
-        }
-        myfile.close();
+      Edge e;
+      while(myfile >> e.src >> e.dest)
+      {
+         unsigned larger = (e.src > e.dest)? e.src : e.dest;
+         num_vertices = (num_vertices > larger)? num_vertices : larger;
+         edges.push_back(e);
+      }
+      ++num_vertices;
+      myfile.close();
     }
-    return input;
+    return edges;
 }
 
-bool ToleranceCheck(const unsigned& num_v, std::vector<double> pagerank, std::vector<double> pre_pagerank)
+bool ToleranceCheck(const unsigned& num_v, Graph *graph)
 {
     // Sum up the pagerank
     double pr_sum = 0.0;
     for (unsigned i = 0; i < num_v; i++) 
     {
-        pr_sum += pagerank[i];
+        pr_sum += graph->vertices[i]->pageRank();
     }
     // Calculate the cur_toleranceor
     pr_sum = 1.0 / pr_sum;
     double cur_tolerance = 0.0;
     for (unsigned i = 0; i < num_v; i++)
     {
-        pagerank[i] *= pr_sum;
+        graph->vertices[i]->setPageRank(graph->vertices[i]->pageRank()*pr_sum);
         // norm 1
-        cur_tolerance += std::fabs(pagerank[i] - pre_pagerank[i]);
+        cur_tolerance += std::fabs(graph->vertices[i]->pageRank() - graph->vertices[i]->prePageRank());
     }
-
     if (cur_tolerance < tolerance)
     {
         std::cout << "Current toleranceor: " << cur_tolerance << std::endl;
@@ -97,14 +67,12 @@ void PageRank(Graph *graph)
 {
     const unsigned num_v = graph->VertexesNum();
     double init_rank = double(1.0 / num_v);
-    std::vector<double> pagerank(num_v);
-    std::vector<double> pre_pagerank(num_v);
     double pr_random = (1.0 - damping_factor) / num_v;
     
     for (unsigned i = 0; i < num_v; i++)
     {
-        pagerank[i] = init_rank;
-        pre_pagerank[i] = 0.0;
+        graph->vertices[i]->setPageRank(init_rank);
+        graph->vertices[i]->setPrePageRank(0.0);
     }
 
     unsigned iter = 0;
@@ -113,18 +81,17 @@ void PageRank(Graph *graph)
         // Update the pagerank values in every iteration
         for (unsigned i = 0; i < num_v; i++)
         {
-            pre_pagerank[i] = pagerank[i];
-            pagerank[i] = 0.0;
-            // std::cout << i+1 << " = "<< pre_pagerank[i] << std::endl;
+            graph->vertices[i]->setPrePageRank(graph->vertices[i]->pageRank());
+            graph->vertices[i]->setPageRank( 0.0 );
         }
 
         // Distribute the pr_sum of all dangling nodes(no outer edges) to all nodes.
         double dangling_pr_sum = 0.0;
         for (unsigned i = 0; i < num_v; i++)
         {
-            if (graph->OutgoingEdgeCount(i) == 0)
+            if(graph->vertices[i]->numOutwardEdges() == 0) 
             {
-                dangling_pr_sum += pre_pagerank[i];
+                dangling_pr_sum += graph->vertices[i]->prePageRank();
             }
         }
         double pr_dangling = damping_factor * dangling_pr_sum / num_v;
@@ -133,25 +100,36 @@ void PageRank(Graph *graph)
         // Update its pagerank value by adding pr_eigenvector from its inward links separately
         for (unsigned i = 0; i < num_v; i++)
         {
-            unsigned inward_edges_num = graph->InwardEdgeCount(i);
-            // std::cout << inward_edges_num << std::endl;
-            for (unsigned edge_num = 0; edge_num < inward_edges_num; edge_num++)
+            for (std::list<Vertex*>::iterator it = graph->vertices[i]->neighbors.begin();
+                it != graph->vertices[i]->neighbors.end(); ++it)
             {
-                unsigned inward_edge_index = graph->adjEdges[i].at(edge_num);
-                // std::cout << inward_edge_index << std::endl;
-                double pr_eigenvector = damping_factor * pre_pagerank[inward_edge_index] / graph->OutgoingEdgeCount(inward_edge_index);
-                pagerank[i] += pr_eigenvector;
+                  unsigned inward_edge_index = (*it)->getIndex();
+                  double num_outward_edges = (*it)->numOutwardEdges();
+                  double pr = graph->vertices[inward_edge_index]->prePageRank();
+                  
+                  double pr_eigenvector = damping_factor * pr / num_outward_edges;
+                  graph->vertices[i]->setPageRank(graph->vertices[i]->pageRank() + pr_eigenvector);
             }
-            pagerank[i] += pr_random + pr_dangling;
+            graph->vertices[i]->setPageRank(graph->vertices[i]->pageRank() + pr_random + pr_dangling);
         }
 
         // finish when cur_toleranceor is smaller than tolerance we set
-        if(ToleranceCheck(num_v,pagerank,pre_pagerank)) 
+        if(ToleranceCheck(num_v, graph)) 
         {
             std::cout << "Iteration time: " << iter << std::endl;
             break;
         }
     }
+}
+
+void printFinalResults(Graph* graph)
+{
+   std::cout << "PageRank values: \n";
+   for(int i = 0; i < graph->VertexesNum(); ++i)
+   {
+     std::cout << "The index is: " << i << " with value " << graph->vertices[i]->pageRank() << '\n';  
+   }
+   std::cout<<'\n';
 }
 
 void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const int loop_t)
@@ -177,8 +155,8 @@ int main(int argc, char *argv[])
             for (int i = 0; i < loop_times; i++)
             {
                 Graph graph(num_vertices, input);
-
                 PageRank(&graph);
+                // printFinalResults(&graph);
             }  
             auto const end_time = std::chrono::steady_clock::now(); 
             PrintBenchmark(start_time, end_time, loop_times);
