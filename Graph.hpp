@@ -1,49 +1,132 @@
 
 #include <iostream>
 #include <vector>
+#include <list>
 
 namespace CSC586C {
 
-namespace original_graph {
+// The first edition of data structure
+// Baseline_graph with AoS and use std::vector<Vertex*> to store the edges and their relationships
+namespace baseline_graph{
 // data structure to store graph edges
-struct Edge 
+struct Edge
 {
 	unsigned src, dest;
 };
 
-// class to represent a graph object
+class Vertex
+{
+public:
+   Vertex(unsigned index_) : index(index_) 
+   {
+      page_rank = 0.0;
+      pre_pagerank = 0.0;
+      num_inward_edges = 0;
+      num_outward_edges = 0;
+      neighbors.resize(0);
+   }
+   void addNeighbor(Vertex* vertex) 
+   {
+      neighbors.push_back(vertex);
+      ++num_inward_edges;
+   }
+   double pageRank() const{
+      return page_rank;
+   }
+   double prePageRank() const{
+      return pre_pagerank;
+   }
+   void setPageRank(double page_rank_){
+      page_rank = page_rank_;
+   }
+   void setPrePageRank(double page_rank_){
+      pre_pagerank = page_rank_;
+   }
+   unsigned numInwardEdges() const{
+      return num_inward_edges;
+   }
+   unsigned numOutwardEdges() const{
+      return num_outward_edges;
+   }
+   unsigned getIndex() const{
+      return index;
+   }
+   void outCountIncrease() {
+      ++num_outward_edges;
+   }
+   // For debugging only
+   void printVertexInfo() const
+   { 
+      std::cout << "Vertex index: " << index << " outward count " << num_outward_edges
+                << "page rank " << page_rank << '\n'
+                << "previous page rank " << pre_pagerank <<'\n';
+      std::cout << "Neighbors: ";
+      for(std::list<Vertex*>::const_iterator it=neighbors.begin(); it!= neighbors.end(); ++it) 
+      {
+         std::cout << (*it)->index << " ";
+      }
+      std::cout << '\n';
+   }
+   std::list<Vertex*> neighbors; //list of inward neighbors (sources)
+private:
+   double page_rank;
+   double pre_pagerank;
+   unsigned num_inward_edges;
+   unsigned num_outward_edges;
+   unsigned index;
+};
+
 class Graph
 {
 public:
-	// construct a vector of vectors to represent each edge index and its inward edges
-	std::vector<std::vector<int> > adjEdges;
-
-	// Graph Constructor
-	Graph(unsigned Num, std::vector<original_graph::Edge> &input): vertex_num(Num), edges(input)
-	{
-		adjEdges.resize(Num);
-		outgoing_edges_num.resize(Num);
-		// add edges to the directed graph
-		for (auto &edge: edges)
-		{
-			adjEdges[edge.dest].push_back(edge.src);
-			outgoing_edges_num[edge.src]++;
-		}
-	}
-	unsigned InwardEdgeCount(unsigned i) { return adjEdges[i].size();}
-	unsigned OutgoingEdgeCount(unsigned i) { return outgoing_edges_num[i]; }
-	unsigned VertexesNum() {return vertex_num;}
-
+   Graph(unsigned num_vertices_, std::vector<Edge> edges) : num_vertices(num_vertices_){
+      vertices.resize(0);
+      //Initialize all the vertices on this graph
+      for(int i=0; i<num_vertices; ++i){
+         Vertex* vertex = new Vertex(i);
+         vertices.push_back(vertex);
+      }
+      //Add all the edges info
+      for(int i=0; i<edges.size(); ++i){
+         vertices[edges[i].dest]->addNeighbor(vertices[edges[i].src]);
+         vertices[edges[i].src]->outCountIncrease();
+      }
+   }
+   unsigned VertexesNum() const{
+      return num_vertices;
+   }
+   void printGraphInfo() const 
+   { //For debugging only
+      std::cout << "==================PRINT GRAPH=====================\n";
+      std::cout << "Number of vertices: "<<num_vertices<<'\n';
+      double pagerank_sum = 0.0;
+      for(int i=0; i<num_vertices; ++i) {
+         vertices[i]->printVertexInfo();
+         pagerank_sum += vertices[i]->pageRank();
+      }
+      std::cout << "Total pagerank sum is " << pagerank_sum << '\n';
+      std::cout << "=========================END======================\n";
+   }
+   ~Graph() {
+      for(int i=0; i<num_vertices; ++i){
+         Vertex* vertex  = vertices[i];
+         delete vertex;
+      }
+      vertices.resize(0);
+      num_vertices = 0;
+   }
+   std::vector<Vertex*> vertices; //All vertices in this graph
 private:
-	unsigned int vertex_num;	
-	std::vector<original_graph::Edge> const &edges;
-	// construct a vector to store outgoing edges for each source index
-	std::vector<int> outgoing_edges_num;
+   unsigned num_vertices;
 };
-}
+}// End of namespace baseline_graph
 
 
 
+
+
+// The second edition of data structure
+// Used cold/hot data and std::vector<std::vector<int> > to store the edges and their relationships
 namespace optimize_graph {
 // data structure to store cold data: edges (pairs of src and dest)
 struct ColdEdge 
@@ -51,7 +134,6 @@ struct ColdEdge
 	unsigned int src;
 	unsigned int dest;
 };
-
 // data structure to store hot data: number of outgoing links each node and its pagerank values 
 struct HotData
 {
@@ -59,9 +141,8 @@ struct HotData
 	double pre_pagerank;
 	int outgoing_edges_num;
 };
-
 // class to represent a graph object
-class SoA_Graph
+class Optimized_Graph
 {
 public:
 	// construct a vector of vectors to represent each edge index and its inward edges (hot data)
@@ -70,7 +151,7 @@ public:
 	std::vector<HotData> nodes;
 
 	// Graph Constructor
-	SoA_Graph(unsigned Num, std::vector<optimize_graph::ColdEdge> &input): vertex_num(Num), edges(input)
+	Optimized_Graph(unsigned Num, std::vector<optimize_graph::ColdEdge> &input): vertex_num(Num), edges(input)
 	{
 		adjEdges.resize(Num);
 		nodes.resize(Num);
@@ -83,120 +164,139 @@ public:
 	}
 	unsigned VertexesNum() {return vertex_num;}
 
+   //For debugging only
+   void printGraph() const 
+   {
+      std::cout << "Number of vertices is: " << vertex_num <<'\n';
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << nodes[i].pre_pagerank << ' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << nodes[i].pagerank << ' ';
+      }
+      std::cout << '\n' << "OutgoingEdgeCount: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << nodes[i].outgoing_edges_num << ' ';
+      }
+      std::cout << '\n' << "The adj matrix:\n";
+      for(int i = 0; i < vertex_num; ++i){
+         for(int j = 0; j < adjEdges[i].size(); ++j){
+            std::cout << adjEdges[i][j] << "--->" << i << " ";
+         }
+         std::cout<<'\n';
+      }
+   }
+   void printHotData() const 
+   {
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << nodes[i].pre_pagerank <<' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << nodes[i].pagerank << ' ';
+      }
+   }
+
 private:
 	unsigned int vertex_num;	
 	// construct a vector to store cold data structure
 	std::vector<optimize_graph::ColdEdge> const &edges;
 };
-}
+} // End of namespace optimize_graph
 
-namespace optimize_algorithm {
+
+
+
+
+// The third edition of data structure
+// Used SoA and std::vector<std::vector<int> > to store the edges and their relationships
+namespace soa_graph {
+
 // data structure to store cold data: edges (pairs of src and dest)
 struct ColdEdge 
 {
-	unsigned int src;
-	unsigned int dest;
+	std::vector<unsigned> src;
+   std::vector<unsigned> dest;
 };
-
 // data structure to store hot data: number of outgoing links each node and its pagerank values 
 struct HotData
 {
-	double pagerank;
-	double pre_pagerank;
+	std::vector<double> pagerank;
+	std::vector<double> pre_pagerank;
+   std::vector<int> outgoing_edges_num; 
 };
-
 // class to represent a graph object
-class Algorithm_Graph
+class SoA_Graph
 {
 public:
 	// construct a vector of vectors to represent each edge index and its inward edges (hot data)
 	std::vector<std::vector<int> > adjEdges;
-	// construct a vector to store hot data structure
-	std::vector<HotData> nodes;
+	// construct a data structure to store hot data arrays
+	HotData hotData;
 
 	// Graph Constructor
-	Algorithm_Graph(unsigned Num, std::vector<optimize_algorithm::ColdEdge> &input): vertex_num(Num), edges(input)
+	SoA_Graph(unsigned Num, const ColdEdge &input): vertex_num(Num), edges(input)
 	{
 		adjEdges.resize(Num);
-		nodes.resize(Num);
+      hotData.pagerank.resize(Num);
+      hotData.pre_pagerank.resize(Num);
+      hotData.outgoing_edges_num.resize(Num);
 		// add edges to the directed graph
-		for (auto &edge: edges)
-		{
-			adjEdges[edge.src].push_back(edge.dest);
-		}
+      for (auto i = 0; i < edges.src.size(); i++)
+      {
+         adjEdges[edges.dest[i]].push_back(edges.src[i]);
+         hotData.outgoing_edges_num[edges.src[i]]++;
+      }
 	}
 	unsigned VertexesNum() {return vertex_num;}
+   //For debugging only
+   void printGraph() const 
+   {
+      std::cout << "Number of vertices is: " << vertex_num <<'\n';
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "OutgoingEdgeCount: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.outgoing_edges_num[i] << ' ';
+      }
+      std::cout << '\n' << "The adj matrix:\n";
+      for(int i = 0; i < vertex_num; ++i){
+         for(int j = 0; j < adjEdges[i].size(); ++j){
+            std::cout << adjEdges[i][j] << "--->" << i << " ";
+         }
+         std::cout<<'\n';
+      }
+   }
+   void printHotData() const 
+   {
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] <<' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+   }
 
 private:
 	unsigned int vertex_num;	
-	// construct a vector to store cold data structure
-	std::vector<optimize_algorithm::ColdEdge> const &edges;
+	// construct data structure to store cold data arrays
+	soa_graph::ColdEdge edges;
 };
-}
+} // End of namespace soa_graph
 
-// namespace Optimize_Matrix {
-// // data structure to store cold data: edges (pairs of src and dest)
-// struct ColdEdge 
-// {
-// 	unsigned int src;
-// 	unsigned int dest;
-// };
-
-// // data structure to store hot data: number of outgoing links each node and its pagerank values 
-// struct HotData
-// {
-// 	double pagerank;
-// 	double pre_pagerank;
-// 	int outgoing_edges_num;
-// };
-
-// // class to represent a graph object
-// class Adj_Matrix
-// {
-// public:
-
-// 	// construct a matrix to represent each edge index and its inward edges (hot data)
-// 	int* adjEdges;
-
-// 	// construct a vector to store hot data structure
-// 	std::vector<HotData> nodes;
-
-// 	// Graph Constructor
-// 	Adj_Matrix(unsigned Num, std::vector<Optimize_Matrix::ColdEdge> &input): vertex_num(Num), edges(input)
-// 	{
-// 		nodes.resize(Num);
-// 		// Construct the matrix
-// 		// Allocating a single big block of memory for all the elements, instead of several little chunks.
-// 		adjEdges = new int[Num * Num];
-
-// 		std::cout << "start for loop to build matrix !!!!!!" << std::endl;
-// 		for (auto &edge: edges)
-// 		{
-// 			// *(*(adjEdges + edge.dest * Num + edge.src)) = 1
-// 			adjEdges[edge.dest * Num + edge.src] = 1;
-// 			nodes[edge.src].outgoing_edges_num++;
-// 		}
-// 		std::cout << "end for loop to build matrix !!!!!!" << std::endl;
-// 	}
-
-// 	const int& operator()(int row, int col) const
-//   	{
-//     	return adjEdges[row * vertex_num + col];
-//   	}
-
-// 	~Adj_Matrix() 
-// 	{
-// 		delete[] adjEdges;
-// 	}
-
-// 	unsigned VertexesNum() {return vertex_num;}
-
-// private:
-// 	unsigned int vertex_num;	
-// 	// construct a vector to store cold data structure
-// 	std::vector<Optimize_Matrix::ColdEdge> const &edges;
-
-// };
-// }
-
-}
+} // End of namespace CSC586C
