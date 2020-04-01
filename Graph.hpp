@@ -271,7 +271,7 @@ public:
       for(int i = 0; i < vertex_num; ++i){
          std::cout << hotData.outgoing_edges_num[i] << ' ';
       }
-      std::cout << '\n' << "The adj matrix:\n";
+      std::cout << '\n' << "The adj graph:\n";
       for(int i = 0; i < vertex_num; ++i){
          for(int j = 0; j < adjEdges[i].size(); ++j){
             std::cout << adjEdges[i][j] << "--->" << i << " ";
@@ -298,5 +298,88 @@ private:
 	soa_graph::ColdEdge edges;
 };
 } // End of namespace soa_graph
+
+
+
+
+namespace optimize_matrix {
+// data structure to store cold data: edges (pairs of src and dest)
+struct ColdEdge 
+{
+   std::vector<int> src;
+   std::vector<int> dest;
+};
+// data structure to store hot data: number of outgoing links each node and its pagerank values 
+struct HotData
+{
+   std::vector<double> pagerank;
+   std::vector<double> pre_pagerank;
+   std::vector<int> outgoing_edges_num; 
+};
+// class to represent a graph object
+class SoA_Matrix
+{
+public:
+   // construct a vector of vectors to represent each edge index and its inward edges (hot data)
+   std::vector<std::vector<int> > adjMatrix;
+   // construct a data structure to store hot data arrays
+   HotData hotData;
+
+   // Matrix Constructor
+   SoA_Matrix(unsigned Num, const ColdEdge &input): vertex_num(Num) {
+      adjMatrix.resize(Num, std::vector<int>(Num,0));
+      hotData.pagerank.resize(Num);
+      hotData.pre_pagerank.resize(Num);
+      hotData.outgoing_edges_num.resize(Num);
+      // add edges to the adjacency matrix
+      for (auto i = 0; i < input.src.size(); i++)
+      {
+         adjMatrix[input.src[i]][input.dest[i]] = 1;
+         hotData.outgoing_edges_num[input.src[i]]++;
+      }
+   }
+   unsigned VertexesNum() {return vertex_num;}
+
+   //For debugging only
+  void printMatrix() const {
+     std::cout<<"Number of vertices " << vertex_num <<'\n';
+     std::cout<<"Hot data: \n";
+     std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "OutgoingEdgeCount: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.outgoing_edges_num[i] << ' ';
+      }
+      std::cout << '\n' << "The adj matrix:\n";
+      for(int i = 0; i < vertex_num; ++i){
+         for(int j = 0; j < vertex_num; ++j){
+            std::cout << adjMatrix[i][j] << " ";
+         }
+         std::cout<<'\n';
+      }
+  }
+  void printHotData() const 
+   {
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] <<' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(int i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+   }
+
+private:
+   unsigned int vertex_num;   
+};
+} // End of namespace optimize_matrix
 
 } // End of namespace CSC586C
