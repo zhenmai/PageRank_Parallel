@@ -2,179 +2,138 @@
 #include <fstream> // std::ifstream
 #include <sstream> // std::stringstream
 #include <string> // std::string, std::stoi
-#include <limits.h> // UINT_MAX
 #include <cstring> // std::strcmp
-#include <cmath>  // std::fabs
-#include <numeric>  // std::accumulate()
+#include <cmath>
 #include <vector>
-#include <chrono>  // timing libraries
+#include <chrono>
+#include <ctime>
 #include <omp.h>
 #include "Graph.hpp"
 
-using namespace CSC586C::optimize_algorithm;
+using namespace CSC586C::soa_graph;
 
 extern const double damping_factor = 0.85;
 extern const unsigned max_iterations = 100;
-extern const double tolerance = 1e-8;
+extern const double tolerance = 1e-10;
 
-// Read Input from file with format:
-// N (#vertex)
-// src_index dest_index ... src_index dest_index (pairs of source and destination links)
-std::vector<ColdEdge> ReadInputFromTextFile(const char* input_file, unsigned& num_vertices)
+// Read Input (pairs of source and destination links) from file with format:
+// src_index dest_index
+// ... 
+// src_index dest_index 
+ColdEdge ReadInputFromTextFile(const char* input_file, unsigned& num_vertices)
 {
-    std::vector<ColdEdge> input;
-    std::string input_line, str;
     std::ifstream myfile (input_file);
-    if (myfile.is_open())
+    ColdEdge edges;
+    unsigned source, destination;
+    if (myfile.is_open()) 
     {
-        while (getline(myfile,input_line))
-        {
-           if (input_line.size() < std::to_string(UINT_MAX).size())
-           {
-                // Record the number of vertexes
-               num_vertices = std::stoi(input_line);
-               // std::cout << input_line << std::endl;
-           } 
-           else
-           {
-                std::stringstream temp_line(input_line);
-                unsigned source = 0;
-                unsigned destination = 0;
-                unsigned count = 0;
-                while (getline(temp_line, str, ' '))
-                {
-                    ++count;
-                    unsigned temp_value = std::stoi(str);
-                    if (count == 1)
-                    {
-                        source = temp_value;
-                    }
-                    else if (count == 2)
-                    {
-                        count = 0;
-                        destination = temp_value;
-                        // Writing out the edges into the graph
-                        // Example: std::vector<Edge> input{ Edge{1,0}, Edge{4,2}, Edge{2,5}, Edge{1,3}};
-                        if (source == destination) break; 
-                        input.push_back(ColdEdge{source, destination});  
-                        // std::cout << source << std::endl;
-                        // std::cout << destination << std::endl;
-                    }
-                }
-           }
-        }
-        myfile.close();
+      while(myfile >> source >> destination)
+      {
+        unsigned larger = (source > destination)? source : destination;
+        num_vertices = (num_vertices > larger)? num_vertices : larger;
+        edges.src.push_back(source);
+        edges.dest.push_back(destination);  
+      }
+      ++num_vertices;
+      myfile.close();
     }
-    return input;
+    return edges;
 }
 
-bool ToleranceCheck(std::vector<HotData>& nodes)
+bool ToleranceCheck(const unsigned& num_v, HotData& hotData)
 {
-    const unsigned& num_v = nodes.size();
-
-    // Normalize every pagerank value to make the probabilities sum to 1
+    // Sum up the pagerank
     double pr_sum = 0.0;
     #pragma omp parallel for reduction(+:pr_sum)
     for (unsigned i = 0; i < num_v; i++) 
     {
-        pr_sum += nodes[i].pagerank;
+        pr_sum += hotData.pagerank[i];
     }
+    // Calculate the cur_toleranceor
     pr_sum = 1.0 / pr_sum;
+    double cur_tolerance = 0.0;
 
-    #pragma omp parallel for
     for (unsigned i = 0; i < num_v; i++)
     {
-        nodes[i].pagerank *= pr_sum;
-    }
-
-    // Calculate the cur_toleranceor 
-    auto const num_threads = omp_get_max_threads();
-    std::vector<double> cur_tolerance(num_threads, 0.0);
-    #pragma omp parallel for
-    for (unsigned i = 0; i < num_v; i++)
-    {
+        hotData.pagerank[i] *= pr_sum;
         // norm 1
-        auto const t = omp_get_thread_num();
-        cur_tolerance[t] += std::fabs(nodes[i].pagerank - nodes[i].pre_pagerank);
+        cur_tolerance += std::fabs(hotData.pagerank[i] - hotData.pre_pagerank[i]);
     }
-    double tolerance_sum = std::accumulate(std::begin(cur_tolerance), std::end(cur_tolerance), 0.0 );
-    
-    // If we meet our tolerance then we break
-    if (tolerance_sum < tolerance)
+    if (cur_tolerance < tolerance)
     {
-        std::cout << "Current toleranceor: " << tolerance_sum << std::endl;
+        std::cout << "Current toleranceor: " << cur_tolerance << std::endl;
         return true;
     }
     return false;
 }
 
-void PageRank(Algorithm_Graph *graph)
+void PageRank(SoA_Graph *graph)
 {
     const unsigned num_v = graph->VertexesNum();
     double init_rank = double(1.0 / num_v);
     double pr_random = (1.0 - damping_factor) / num_v;
-    
-    #pragma omp parallel for
+
+    // #pragma omp parallel for
     for (unsigned i = 0; i < num_v; i++)
     {
-        graph->nodes[i].pagerank = init_rank;
-        graph->nodes[i].pre_pagerank = 0.0;
+        graph->hotData.pagerank[i] = init_rank;
+        graph->hotData.pre_pagerank[i] = 0.0;
     }
 
     unsigned iter = 0;
     while (iter++ < max_iterations)
     {
-        #pragma omp parallel for
-        // Update the pagerank values in every iteration
-        for (unsigned i = 0; i < num_v; i++)
-        {
-            graph->nodes[i].pre_pagerank = graph->nodes[i].pagerank;
-            graph->nodes[i].pagerank = 0.0;
-        }
-
-        // Distribute the pr_sum of all dangling nodes(no outer edges) to all nodes.
         double dangling_pr_sum = 0.0;
+        // Update the pagerank values in every iteration
         #pragma omp parallel for reduction(+:dangling_pr_sum)
         for (unsigned i = 0; i < num_v; i++)
         {
-           // Remove branch prediction
-            dangling_pr_sum += graph->nodes[i].pre_pagerank * (graph->adjEdges[i].size() == 0);
+            graph->hotData.pre_pagerank[i] = graph->hotData.pagerank[i];
+            graph->hotData.pagerank[i] = 0.0;
+            dangling_pr_sum += graph->hotData.pre_pagerank[i] * (graph->hotData.outgoing_edges_num[i] == 0);
         }
+
         double pr_dangling = damping_factor * dangling_pr_sum / num_v;
 
         // Iterater all the vertexes and calculate its adjacency function l(pi,pj) of all inward links
         // Update its pagerank value by adding pr_eigenvector from its inward links separately
-        // In this step we have done pr[p]← pr[p]
         #pragma omp parallel for
         for (unsigned i = 0; i < num_v; i++)
         {
-            unsigned outgoing_edges_num = graph->adjEdges[i].size();
-            for (unsigned edge_index = 0; edge_index < outgoing_edges_num; edge_index++)
-            {
-                double pr_eigenvector = damping_factor * graph->nodes[i].pre_pagerank / outgoing_edges_num;
-                unsigned update_edge = graph->adjEdges[i].at(edge_index);
-                #pragma omp atomic
-                graph->nodes[update_edge].pagerank += pr_eigenvector;
-            }
-        }
+            unsigned inward_edges_num = graph->adjEdges[i].size();
 
-        // Calculate the total pagerank value by adding the pr[p]← 1-d/N + pr_dangling/N
-        #pragma omp parallel for
-        for (unsigned i = 0; i < num_v; ++i)
-        {
-            graph->nodes[i].pagerank += pr_random + pr_dangling;
+            for (unsigned edge_num = 0; edge_num < inward_edges_num; edge_num++)
+            {
+                unsigned inward_edge_index = graph->adjEdges[i].at(edge_num);
+
+                double pr_eigenvector = damping_factor * graph->hotData.pre_pagerank[inward_edge_index]
+                                        / graph->hotData.outgoing_edges_num[inward_edge_index];
+                graph->hotData.pagerank[i] += pr_eigenvector;
+            }
+            // #pragma omp atomic
+            graph->hotData.pagerank[i] += (pr_random + pr_dangling);
         }
 
         // finish when cur_toleranceor is smaller than tolerance we set
-        if(ToleranceCheck(graph->nodes)) 
+        if(ToleranceCheck(num_v, graph->hotData)) 
         {
-            std::cout << "Total iteration time: " << iter << std::endl;
+            std::cout << "Iteration time: " << iter << std::endl;
             break;
         }
     }
 }
 
-void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const int loop_t)
+void printFinalResults(SoA_Graph* graph)
+{
+    std::cout << "PageRank values: \n";
+    for(int i = 0; i < graph->VertexesNum(); ++i)
+    {
+        std::cout << "The index is: " << i << " with value " << graph->hotData.pagerank[i] << '\n';  
+    }
+    std::cout<<'\n';
+}
+
+void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const unsigned loop_t)
 {
     auto const avg_time = std::chrono::duration_cast<std::chrono::microseconds>( end_t - start_t ).count() / double(loop_t);
     std::cout << "Average total running time  = " << avg_time << " us" << std::endl;
@@ -182,15 +141,15 @@ void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, 
 
 int main(int argc, char *argv[])
 {
-    int loop_times = 10;
+    unsigned loop_times = 10;
     unsigned num_vertices = 0;
-
     if(argc >= 4)
     {
-        std::vector<ColdEdge> input = ReadInputFromTextFile(argv[ 1 ], num_vertices);
-        const char* test_mode = argv[ 2 ];
+        const char* test_mode = argv[2];
         omp_set_num_threads( atoi( argv[ 3 ] ) );
         std::cout << "The number of threads used: " << omp_get_max_threads() << std::endl;
+
+        ColdEdge input = ReadInputFromTextFile(argv[1], num_vertices);
 
         if(std::strcmp(test_mode, "total") == 0)
         {
@@ -198,8 +157,7 @@ int main(int argc, char *argv[])
 
             for (int i = 0; i < loop_times; i++)
             {
-                Algorithm_Graph graph(num_vertices, input);
-
+                SoA_Graph graph(num_vertices, input);
                 PageRank(&graph);
             }  
             auto const end_time = std::chrono::steady_clock::now(); 
@@ -208,7 +166,7 @@ int main(int argc, char *argv[])
         else if(std::strcmp(test_mode, "graph") == 0 )
         {
             auto const start_time = std::chrono::steady_clock::now();
-            Algorithm_Graph graph(num_vertices, input);
+            SoA_Graph graph(num_vertices, input);
             auto const end_time = std::chrono::steady_clock::now(); 
 
             PageRank(&graph);  
@@ -216,9 +174,9 @@ int main(int argc, char *argv[])
         }
         else if(std::strcmp(test_mode, "pagerank") == 0)
         {
-            Algorithm_Graph graph(num_vertices, input);
+            SoA_Graph graph(num_vertices, input);
             auto const start_time = std::chrono::steady_clock::now();
-            for (int i = 0; i < loop_times; i++)
+            for (unsigned i = 0; i < loop_times; i++)
             {
                 PageRank(&graph);
             }
@@ -228,17 +186,19 @@ int main(int argc, char *argv[])
         else
         {
             std::cout << "Invalid Input!" << std::endl;
+            std::cout << "Please input the input text file name wanted in argc[1]" << std::endl;
+            std::cout << "Please input the time mode(total/graph/pangerank) to be record in argc[2]" << std::endl;
+            std::cout << "Please input the number of threads wanted to use in argc[3]" << std::endl;
         }
     }
     else if (argc >= 2 && argc < 4)
     {
-        std::vector<ColdEdge> input = ReadInputFromTextFile(argv[ 1 ], num_vertices);
+        ColdEdge input = ReadInputFromTextFile(argv[1], num_vertices);
         std::cout << "The number of threads used: " << omp_get_max_threads() << std::endl;
         auto const start_time = std::chrono::steady_clock::now();
         for (int i = 0; i < loop_times; i++)
         {
-            Algorithm_Graph graph(num_vertices, input);
-
+            SoA_Graph graph(num_vertices, input);
             PageRank(&graph);
         }  
         auto const end_time = std::chrono::steady_clock::now(); 
@@ -251,6 +211,5 @@ int main(int argc, char *argv[])
         std::cout << "Please input the time mode(total/graph/pangerank) to be record in argc[2]" << std::endl;
         std::cout << "Please input the number of threads wanted to use in argc[3]" << std::endl;
     }
-
     return 0;
 }
