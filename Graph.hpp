@@ -247,7 +247,7 @@ public:
       hotData.pre_pagerank.resize(Num);
       hotData.outgoing_edges_num.resize(Num);
 		// add edges to the directed graph
-      for (auto i = 0; i < edges.src.size(); i++)
+      for (unsigned i = 0; i < edges.src.size(); i++)
       {
          adjEdges[edges.dest[i]].push_back(edges.src[i]);
          hotData.outgoing_edges_num[edges.src[i]]++;
@@ -332,7 +332,7 @@ public:
       hotData.pre_pagerank.resize(Num);
       hotData.outgoing_edges_num.resize(Num);
       // add edges to the adjacency matrix
-      for (auto i = 0; i < input.src.size(); i++)
+      for (unsigned i = 0; i < input.src.size(); i++)
       {
          adjMatrix[input.src[i]][input.dest[i]] = 1;
          hotData.outgoing_edges_num[input.src[i]]++;

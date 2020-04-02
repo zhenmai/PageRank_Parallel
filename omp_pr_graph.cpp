@@ -126,7 +126,7 @@ void PageRank(SoA_Graph *graph)
 void printFinalResults(SoA_Graph* graph)
 {
     std::cout << "PageRank values: \n";
-    for(int i = 0; i < graph->VertexesNum(); ++i)
+    for(unsigned i = 0; i < graph->VertexesNum(); ++i)
     {
         std::cout << "The index is: " << i << " with value " << graph->hotData.pagerank[i] << '\n';  
     }
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
         {
             auto const start_time = std::chrono::steady_clock::now();
 
-            for (int i = 0; i < loop_times; i++)
+            for (unsigned i = 0; i < loop_times; i++)
             {
                 SoA_Graph graph(num_vertices, input);
                 PageRank(&graph);
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
         ColdEdge input = ReadInputFromTextFile(argv[1], num_vertices);
         std::cout << "The number of threads used: " << omp_get_max_threads() << std::endl;
         auto const start_time = std::chrono::steady_clock::now();
-        for (int i = 0; i < loop_times; i++)
+        for (unsigned i = 0; i < loop_times; i++)
         {
             SoA_Graph graph(num_vertices, input);
             PageRank(&graph);
