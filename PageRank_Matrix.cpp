@@ -99,8 +99,9 @@ void PageRank(SoA_Matrix *graph)
                      if(graph->adjMatrix[y][x] == 1) {
                         unsigned inward_edge_index = y;
 
-                        double pr_eigenvector = damping_factor * graph->hotData.pre_pagerank[inward_edge_index]
-                                        / graph->hotData.outgoing_edges_num[inward_edge_index];
+                        double pr_eigenvector = damping_factor * 
+                        graph->hotData.pre_pagerank[inward_edge_index]
+                        / graph->hotData.outgoing_edges_num[inward_edge_index];
                         
                         graph->hotData.pagerank[x] += pr_eigenvector;
                      }
@@ -156,7 +157,7 @@ int main(int argc, char *argv[])
 {
     if(argc == 3)
     {
-        unsigned loop_times = 1;
+        int loop_times = 1;
         unsigned num_vertices = 0;
         const char* test_mode = argv[2];
 
@@ -170,7 +171,28 @@ int main(int argc, char *argv[])
             {
                 SoA_Matrix graph(num_vertices, input);
                 PageRank(&graph);
+                // printFinalResults(&graph);
             }  
+            auto const end_time = std::chrono::steady_clock::now(); 
+            PrintBenchmark(start_time, end_time, loop_times);
+        }
+        else if(std::strcmp(test_mode, "graph") == 0 )
+        {
+            auto const start_time = std::chrono::steady_clock::now();
+            SoA_Matrix graph(num_vertices, input);
+            auto const end_time = std::chrono::steady_clock::now(); 
+
+            PageRank(&graph);  
+            PrintBenchmark(start_time, end_time, 1);          
+        }
+        else if(std::strcmp(test_mode, "pagerank") == 0)
+        {
+            SoA_Matrix graph(num_vertices, input);
+            auto const start_time = std::chrono::steady_clock::now();
+            for (int i = 0; i < loop_times; i++)
+            {
+                PageRank(&graph);
+            }
             auto const end_time = std::chrono::steady_clock::now(); 
             PrintBenchmark(start_time, end_time, loop_times);
         }
@@ -188,3 +210,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+

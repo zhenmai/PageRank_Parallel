@@ -82,12 +82,12 @@ public:
    Graph(unsigned num_vertices_, std::vector<Edge> edges) : num_vertices(num_vertices_){
       vertices.resize(0);
       //Initialize all the vertices on this graph
-      for(int i=0; i<num_vertices; ++i){
+      for(unsigned i=0; i<num_vertices; ++i){
          Vertex* vertex = new Vertex(i);
          vertices.push_back(vertex);
       }
       //Add all the edges info
-      for(int i=0; i<edges.size(); ++i){
+      for(unsigned i=0; i<edges.size(); ++i){
          vertices[edges[i].dest]->addNeighbor(vertices[edges[i].src]);
          vertices[edges[i].src]->outCountIncrease();
       }
@@ -100,7 +100,7 @@ public:
       std::cout << "==================PRINT GRAPH=====================\n";
       std::cout << "Number of vertices: "<<num_vertices<<'\n';
       double pagerank_sum = 0.0;
-      for(int i=0; i<num_vertices; ++i) {
+      for(unsigned i=0; i<num_vertices; ++i) {
          vertices[i]->printVertexInfo();
          pagerank_sum += vertices[i]->pageRank();
       }
@@ -108,7 +108,7 @@ public:
       std::cout << "=========================END======================\n";
    }
    ~Graph() {
-      for(int i=0; i<num_vertices; ++i){
+      for(unsigned i=0; i<num_vertices; ++i){
          Vertex* vertex  = vertices[i];
          delete vertex;
       }
@@ -170,20 +170,20 @@ public:
       std::cout << "Number of vertices is: " << vertex_num <<'\n';
       std::cout << "Hot data: \n";
       std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << nodes[i].pre_pagerank << ' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << nodes[i].pagerank << ' ';
       }
       std::cout << '\n' << "OutgoingEdgeCount: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << nodes[i].outgoing_edges_num << ' ';
       }
       std::cout << '\n' << "The adj matrix:\n";
-      for(int i = 0; i < vertex_num; ++i){
-         for(int j = 0; j < adjEdges[i].size(); ++j){
+      for(unsigned i = 0; i < vertex_num; ++i){
+         for(unsigned j = 0; j < adjEdges[i].size(); ++j){
             std::cout << adjEdges[i][j] << "--->" << i << " ";
          }
          std::cout<<'\n';
@@ -193,11 +193,11 @@ public:
    {
       std::cout << "Hot data: \n";
       std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << nodes[i].pre_pagerank <<' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << nodes[i].pagerank << ' ';
       }
    }
@@ -260,20 +260,20 @@ public:
       std::cout << "Number of vertices is: " << vertex_num <<'\n';
       std::cout << "Hot data: \n";
       std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pre_pagerank[i] << ' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pagerank[i] << ' ';
       }
       std::cout << '\n' << "OutgoingEdgeCount: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.outgoing_edges_num[i] << ' ';
       }
       std::cout << '\n' << "The adj graph:\n";
-      for(int i = 0; i < vertex_num; ++i){
-         for(int j = 0; j < adjEdges[i].size(); ++j){
+      for(unsigned i = 0; i < vertex_num; ++i){
+         for(unsigned j = 0; j < adjEdges[i].size(); ++j){
             std::cout << adjEdges[i][j] << "--->" << i << " ";
          }
          std::cout<<'\n';
@@ -283,11 +283,11 @@ public:
    {
       std::cout << "Hot data: \n";
       std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pre_pagerank[i] <<' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pagerank[i] << ' ';
       }
    }
@@ -345,20 +345,20 @@ public:
      std::cout<<"Number of vertices " << vertex_num <<'\n';
      std::cout<<"Hot data: \n";
      std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pre_pagerank[i] << ' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pagerank[i] << ' ';
       }
       std::cout << '\n' << "OutgoingEdgeCount: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.outgoing_edges_num[i] << ' ';
       }
       std::cout << '\n' << "The adj matrix:\n";
-      for(int i = 0; i < vertex_num; ++i){
-         for(int j = 0; j < vertex_num; ++j){
+      for(unsigned i = 0; i < vertex_num; ++i){
+         for(unsigned j = 0; j < vertex_num; ++j){
             std::cout << adjMatrix[i][j] << " ";
          }
          std::cout<<'\n';
@@ -368,11 +368,11 @@ public:
    {
       std::cout << "Hot data: \n";
       std::cout << "Pre_pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pre_pagerank[i] <<' ';
       }
       std::cout << '\n' << "Pagerank: ";
-      for(int i = 0; i < vertex_num; ++i){
+      for(unsigned i = 0; i < vertex_num; ++i){
          std::cout << hotData.pagerank[i] << ' ';
       }
    }
