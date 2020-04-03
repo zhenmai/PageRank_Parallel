@@ -383,7 +383,7 @@ private:
 
 
 
-// The third edition of data structure for GPU computng
+// The fourth edition of data structure for GPU computng
 // Used SoA and int* adjE to store the edges and their relationships
 namespace gpu_graph {
 // data structure to store cold data: edges (pairs of src and dest)
@@ -417,7 +417,7 @@ public:
      HotData hotData;
 
      // Graph Constructor
-     SoA_Graph(unsigned Num, const ColdEdge &input): vertex_num(Num), edges(input)
+     GPU_Graph(unsigned Num, const ColdEdge &input): vertex_num(Num), edges(input)
      {
          adjEdges.resize(Num);
          hotData.pagerank.resize(Num);
@@ -507,7 +507,7 @@ private:
    // construct data structure to store cold data arrays
    gpu_graph::ColdEdge edges;
 };
-} // End of namespace soa_graph
+} // End of namespace gpu_graph
 
 
 } // End of namespace CSC586C
