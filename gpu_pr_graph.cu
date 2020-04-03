@@ -91,10 +91,12 @@ void update_pagerank( int *ingoing_edges_num, int *outgoing_edges_num,
 
 void PageRank(GPU_Graph *graph)
 {
-#ifdef GPU
    const unsigned num_v = graph->VertexesNum();
    double init_rank = double(1.0 / num_v);
    double pr_random = (1.0 - damping_factor) / num_v;
+   unsigned iter = 0;
+
+#ifdef GPU
 
    // calculate number of blocks. block_size is fixed to 512
    auto const num_blocks = std::ceil( num_v / static_cast< float >( blocksize) );
@@ -138,7 +140,6 @@ void PageRank(GPU_Graph *graph)
    cudaMemcpy( dev_pagerank, graph->hotData.pagerank.data(),
                num_v*sizeof(double), cudaMemcpyHostToDevice );
 
-   unsigned iter = 0;
    while(iter++ < max_iterations){
       double dangling_pr_sum = 0.0;
       // Update the pagerank values in every iteration
@@ -180,17 +181,12 @@ void PageRank(GPU_Graph *graph)
 
 #if 0
     // This is the original algorithm in CPU which we port to GPU
-    const unsigned num_v = graph->VertexesNum();
-    double init_rank = double(1.0 / num_v);
-    double pr_random = (1.0 - damping_factor) / num_v;
-
     for (unsigned i = 0; i < num_v; i++)
     {
         graph->hotData.pagerank[i] = init_rank;
         graph->hotData.pre_pagerank[i] = 0.0;
     }
 
-    unsigned iter = 0;
     while (iter++ < max_iterations)
     {
         double dangling_pr_sum = 0.0;
