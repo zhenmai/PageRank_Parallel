@@ -444,7 +444,7 @@ public:
             }
          }
      }
-     ~SoA_Graph() {
+     ~GPU_Graph() {
          delete [] adjE;
      }
      unsigned VertexesNum() {return vertex_num;}
