@@ -159,7 +159,15 @@ void PageRank(GPU_Graph *graph)
                                                    dev_begin_index, dev_adj_edges, dev_pre_pagerank,
                                                    dev_pr_dangling, dev_pr_random, dev_pagerank, num_v);
       cudaMemcpy( graph->hotData.pagerank.data(), dev_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToHost );
+      cudaMemcpy( graph->hotData.pre_pagerank.data(), dev_pre_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToHost );
+      // finish when cur_toleranceor is smaller than tolerance we set
+      if(ToleranceCheck(num_v, graph->hotData)) 
+      {
+          std::cout << "Iteration time: " << iter << std::endl;
+          break;
+      }
    }
+   // Free the memory on device side
    cudaFree( dev_ingoing_edge_nums );
    cudaFree( dev_outgoing_edge_nums );
    cudaFree( dev_begin_index );
@@ -209,6 +217,12 @@ void PageRank(GPU_Graph *graph)
                graph->hotData.pagerank[i] += pr_eigenvector;
             }
             graph->hotData.pagerank[i] += (pr_random + pr_dangling);
+        }
+        // finish when cur_toleranceor is smaller than tolerance we set
+        if(ToleranceCheck(num_v, graph->hotData)) 
+        {
+            std::cout << "Iteration time: " << iter << std::endl;
+            break;
         }
     }
 #endif
