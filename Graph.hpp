@@ -376,10 +376,138 @@ public:
          std::cout << hotData.pagerank[i] << ' ';
       }
    }
-
 private:
    unsigned int vertex_num;   
 };
 } // End of namespace optimize_matrix
+
+
+
+// The third edition of data structure for GPU computng
+// Used SoA and int* adjE to store the edges and their relationships
+namespace gpu_graph {
+// data structure to store cold data: edges (pairs of src and dest)
+struct ColdEdge 
+{
+   std::vector<unsigned> src;
+   std::vector<unsigned> dest;
+};
+// data structure to store hot data: number of outgoing links each node and its pagerank values 
+struct HotData
+{
+   std::vector<double> pagerank;
+   std::vector<double> pre_pagerank;
+   std::vector<int> outgoing_edges_num;
+};
+// class to represent a graph object
+class GPU_Graph
+{
+public:
+     // construct a vector of vectors to represent each edge index and its inward edges (hot data)
+     std::vector<std::vector<int> > adjEdges;
+     // Store the number of ingoing edges.
+     std::vector<int> ingoing_edges_num;
+     // Store every node's begin index, which is likely a pointer to the index of node.
+     std::vector<int> beginIndex;
+     // Store the inward edges in 1-D array, the size of which is the same as the number of links.
+     // (1-D array version of adjEdges). 
+     int* adjE; 
+     int num_edges;
+     // construct a data structure to store hot data arrays
+     HotData hotData;
+
+     // Graph Constructor
+     SoA_Graph(unsigned Num, const ColdEdge &input): vertex_num(Num), edges(input)
+     {
+         adjEdges.resize(Num);
+         hotData.pagerank.resize(Num);
+         hotData.pre_pagerank.resize(Num);
+         hotData.outgoing_edges_num.resize(Num);
+         ingoing_edges_num.resize(Num);
+         beginIndex.resize(Num);
+         // add edges to the directed graph
+         for (unsigned i = 0; i < edges.src.size(); i++)
+         {
+            adjEdges[edges.dest[i]].push_back(edges.src[i]);
+            hotData.outgoing_edges_num[edges.src[i]]++;
+         }
+         // Initialize adjE for GPU optimization
+         num_edges = edges.src.size();
+         adjE = new int[num_edges];
+         int index = 0;
+         for(unsigned i = 0; i < Num; ++i) {
+            ingoing_edges_num[i] = adjEdges[i].size();
+            beginIndex[i] = index;
+            for(int j=0; j<ingoing_edges_num[i]; ++j){
+               adjE[index] = adjEdges[i][j];
+               ++index;
+            }
+         }
+     }
+     ~SoA_Graph() {
+         delete [] adjE;
+     }
+     unsigned VertexesNum() {return vertex_num;}
+
+     //Print GPU related data for debugging
+     void printGpuData() const
+     {
+         std::cout<<"========================GPU INFO BEGIN========================\n";
+         for(unsigned i = 0; i < vertex_num; ++i) {
+            std::cout<<" Num of ingoing edges at " << i << " is "<< ingoing_edges_num[i]
+                     <<" index begins at " << beginIndex[i] << " neighbors: \n";
+            int index = beginIndex[i];
+            for(unsigned j = 0; j < ingoing_edges_num[i]; ++j){
+               std::cout<<adjE[index + j]<<" ";
+            }
+            std::cout<<'\n';
+         }
+         std::cout<<"========================GPU INFO END==========================\n";
+     }
+   //For debugging only
+   void printGraph() const 
+   {
+      std::cout << "Number of vertices is: " << vertex_num <<'\n';
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+      std::cout << '\n' << "OutgoingEdgeCount: ";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         std::cout << hotData.outgoing_edges_num[i] << ' ';
+      }
+      std::cout << '\n' << "The adj graph:\n";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         for(unsigned j = 0; j < adjEdges[i].size(); ++j){
+            std::cout << adjEdges[i][j] << "--->" << i << " ";
+         }
+         std::cout<<'\n';
+      }
+   }
+   void printHotData() const 
+   {
+      std::cout << "Hot data: \n";
+      std::cout << "Pre_pagerank: ";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pre_pagerank[i] <<' ';
+      }
+      std::cout << '\n' << "Pagerank: ";
+      for(unsigned i = 0; i < vertex_num; ++i){
+         std::cout << hotData.pagerank[i] << ' ';
+      }
+   }
+
+private:
+   unsigned int vertex_num;   
+   // construct data structure to store cold data arrays
+   gpu_graph::ColdEdge edges;
+};
+} // End of namespace soa_graph
+
 
 } // End of namespace CSC586C
