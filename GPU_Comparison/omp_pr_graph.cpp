@@ -166,6 +166,7 @@ int main(int argc, char *argv[])
             {
                 SoA_Graph graph(num_vertices, input);
                 PageRank(&graph);
+                //printFinalResults(&graph);
             }  
             auto const end_time = std::chrono::steady_clock::now(); 
             PrintBenchmark(start_time, end_time, loop_times);

@@ -457,7 +457,7 @@ public:
             std::cout<<" Num of ingoing edges at " << i << " is "<< ingoing_edges_num[i]
                      <<" index begins at " << beginIndex[i] << " neighbors: \n";
             int index = beginIndex[i];
-            for(unsigned j = 0; j < ingoing_edges_num[i]; ++j){
+            for(int j = 0; j < ingoing_edges_num[i]; ++j){
                std::cout<<adjE[index + j]<<" ";
             }
             std::cout<<'\n';
