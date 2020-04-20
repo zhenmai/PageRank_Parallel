@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 {
     if(argc == 3)
     {
-        unsigned loop_times = 5;
+        unsigned loop_times = 10;
         unsigned num_vertices = 0;
         const char* test_mode = argv[2];
 

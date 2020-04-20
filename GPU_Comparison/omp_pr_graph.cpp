@@ -146,7 +146,7 @@ void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, 
 
 int main(int argc, char *argv[])
 {
-    unsigned loop_times = 5;
+    unsigned loop_times = 10;
     unsigned num_vertices = 0;
     if(argc >= 4)
     {

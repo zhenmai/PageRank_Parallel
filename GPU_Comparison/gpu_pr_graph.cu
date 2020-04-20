@@ -238,7 +238,7 @@ void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, 
 
 int main(int argc, char *argv[])
 {
-    unsigned loop_times = 5;
+    unsigned loop_times = 10;
     unsigned num_vertices = 0;
     if(argc >= 4)
     {
@@ -290,10 +290,10 @@ int main(int argc, char *argv[])
     else if (argc >= 2 && argc < 4)
     {
         ColdEdge input = ReadInputFromTextFile(argv[1], num_vertices);
+        GPU_Graph graph(num_vertices, input);
         auto const start_time = std::chrono::steady_clock::now();
         for (int i = 0; i < loop_times; i++)
         {
-            GPU_Graph graph(num_vertices, input);
             PageRank(&graph);
             //printFinalResults(&graph);
         }  
