@@ -114,7 +114,7 @@ void PageRank(Graph *graph)
             graph->vertices[i]->setPageRank(graph->vertices[i]->pageRank() + pr_random + pr_dangling);
         }
 
-#ifdef CheckTolerance
+#if CheckTolerance
         // finish when cur_toleranceor is smaller than tolerance we set
         if(ToleranceCheck(num_v, graph)) 
         {
@@ -122,7 +122,7 @@ void PageRank(Graph *graph)
             break;
         }
 #endif
-        
+
     }
 }
 

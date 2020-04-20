@@ -116,7 +116,7 @@ void PageRank(SoA_Graph *graph)
             graph->hotData.pagerank[i] += (pr_random + pr_dangling);
         }
 
-#ifdef CheckTolerance
+#if CheckTolerance
         // finish when cur_toleranceor is smaller than tolerance we set
         if(ToleranceCheck(num_v, graph->hotData)) 
         {
