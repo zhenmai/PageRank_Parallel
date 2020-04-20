@@ -74,7 +74,7 @@ void PageRank(SoA_Graph *graph)
     double init_rank = double(1.0 / num_v);
     double pr_random = (1.0 - damping_factor) / num_v;
 
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (unsigned i = 0; i < num_v; i++)
     {
         graph->hotData.pagerank[i] = init_rank;
@@ -146,7 +146,7 @@ void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, 
 
 int main(int argc, char *argv[])
 {
-    unsigned loop_times = 10;
+    unsigned loop_times = 5;
     unsigned num_vertices = 0;
     if(argc >= 4)
     {
