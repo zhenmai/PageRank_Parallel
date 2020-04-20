@@ -17,7 +17,6 @@ extern const double damping_factor = 0.85;
 extern const unsigned max_iterations = 100;
 extern const double tolerance = 1e-10;
 const int blocksize = 512;
-std::chrono::duration<double> kernel_cost(0);
 
 // Read Input (pairs of source and destination links) from file with format:
 // src_index dest_index
@@ -72,20 +71,22 @@ bool ToleranceCheck(const unsigned& num_v, HotData& hotData)
 __global__
 void update_pagerank( int *ingoing_edges_num, int *outgoing_edges_num,
                       int *begin_index, int *adj_edges, double *pre_pagerank,
-                      double* pr_dangling, double* pr_random, double *pagerank,
-                      size_t n )
+                      double pr_dangling, double* pr_random, double *pagerank,
+                      double* dangling_vec, size_t n )
 {
    int const index = threadIdx.x + blockIdx.x * blockDim.x;
    if( index < n ) {
       int num_edges = ingoing_edges_num[index];
       int begin_index_ = begin_index[index];
+      pagerank[index] = 0.0;
       for( int i = 0; i < num_edges; ++i ){
          int inward_edge_index = adj_edges[begin_index_ + i];
          double pr_eigenvector = 0.85 * pre_pagerank[inward_edge_index]
                                  / outgoing_edges_num[inward_edge_index];
          pagerank[index] += pr_eigenvector;
       }
-      pagerank[index] += (*pr_random + *pr_dangling);
+      pagerank[index] += (*pr_random + pr_dangling);
+      dangling_vec[index] = pagerank[index] * (outgoing_edges_num[index] == 0);
    }
 }
 #endif
@@ -108,8 +109,8 @@ void PageRank(GPU_Graph *graph)
    int *dev_adj_edges;
    double *dev_pre_pagerank;
    double *dev_pagerank;
-   double *dev_pr_dangling;
    double *dev_pr_random;
+   double *dev_dangling_vec;
 
    //Allocate memory for elments mapped to GPU
    cudaMalloc( (void **) &dev_ingoing_edge_nums, num_v*sizeof(int) );
@@ -118,8 +119,11 @@ void PageRank(GPU_Graph *graph)
    cudaMalloc( (void **) &dev_adj_edges, graph->num_edges*sizeof(int) );
    cudaMalloc( (void **) &dev_pagerank, num_v*sizeof(double) );
    cudaMalloc( (void **) &dev_pre_pagerank, num_v*sizeof(double) );
-   cudaMalloc( (void **) &dev_pr_dangling, sizeof(double) );
    cudaMalloc( (void **) &dev_pr_random, sizeof(double) );
+   cudaMalloc( (void **) &dev_dangling_vec, num_v*sizeof(double) );
+
+   //Define trust objects and wrap raw pointers with device pointers
+   thrust::device_ptr<double> dev_thrust_dangling_vec(dev_dangling_vec);
 
    //Initialize obejcts that won't be changed in the algorithm
    cudaMemcpy( dev_ingoing_edge_nums, graph->ingoing_edges_num.data(),
@@ -141,47 +145,32 @@ void PageRank(GPU_Graph *graph)
    cudaMemcpy( dev_pagerank, graph->hotData.pagerank.data(),
                num_v*sizeof(double), cudaMemcpyHostToDevice );
 
-   while(iter++ < max_iterations){
-      double dangling_pr_sum = 0.0;
-      // Update the pagerank values in every iteration
-      for (unsigned i = 0; i < num_v; i++)
-      {
-         dangling_pr_sum += graph->hotData.pagerank[i] * (graph->hotData.outgoing_edges_num[i] == 0);
-         graph->hotData.pre_pagerank[i] = 0.0;
-      }
-      double pr_dangling = damping_factor * dangling_pr_sum / num_v;
-      cudaMemcpy( dev_pre_pagerank, graph->hotData.pagerank.data(),
-                  num_v*sizeof(double), cudaMemcpyHostToDevice );
-      cudaMemcpy( dev_pagerank, graph->hotData.pre_pagerank.data(),
-                  num_v*sizeof(double), cudaMemcpyHostToDevice );
-      cudaMemcpy( dev_pr_dangling, &pr_dangling, sizeof(double), cudaMemcpyHostToDevice );
+   double dangling_pr_sum = 0.0;
+   for (unsigned i = 0; i < num_v; i++)
+   {
+      dangling_pr_sum += graph->hotData.pagerank[i] * (graph->hotData.outgoing_edges_num[i] == 0);
+   }
 
-      auto start_kernel = std::chrono::steady_clock::now();
+   unsigned iter = 0;
+   while(iter++ < max_iterations){
+      double pr_dangling = damping_factor * dangling_pr_sum / num_v;
+      cudaMemcpy( dev_pre_pagerank, dev_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToDevice );
       //Main function in this algorithm to update pagerank at each iteration, hand over to GPU
       update_pagerank<<< num_blocks, blocksize >>>(dev_ingoing_edge_nums, dev_outgoing_edge_nums,
                                                    dev_begin_index, dev_adj_edges, dev_pre_pagerank,
-                                                   dev_pr_dangling, dev_pr_random, dev_pagerank, num_v);
-      auto end_kernel = std::chrono::steady_clock::now();
-      kernel_cost += (end_kernel - start_kernel);
-
-      cudaMemcpy( graph->hotData.pagerank.data(), dev_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToHost );
-      //cudaMemcpy( graph->hotData.pre_pagerank.data(), dev_pre_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToHost );
-      // finish when cur_toleranceor is smaller than tolerance we set
-      //if(ToleranceCheck(num_v, graph->hotData)) 
-      //{
-      //    std::cout << "Iteration time: " << iter << std::endl;
-      //    break;
-      //}
+                                                   pr_dangling, dev_pr_random, dev_pagerank,
+                                                   dev_dangling_vec, num_v);
+      dangling_pr_sum = thrust::reduce( dev_thrust_dangling_vec, dev_thrust_dangling_vec+num_v );
    }
-   // Free the memory on device side
+   cudaMemcpy( graph->hotData.pagerank.data(), dev_pagerank, num_v*sizeof(double), cudaMemcpyDeviceToHost );
    cudaFree( dev_ingoing_edge_nums );
    cudaFree( dev_outgoing_edge_nums );
    cudaFree( dev_begin_index );
    cudaFree( dev_adj_edges );
    cudaFree( dev_pagerank );
    cudaFree( dev_pre_pagerank );
-   cudaFree( dev_pr_dangling );
    cudaFree( dev_pr_random );
+   cudaFree( dev_dangling_vec );
 #endif
 
 #if 0
@@ -241,15 +230,13 @@ void printFinalResults(GPU_Graph* graph)
 
 void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const unsigned loop_t)
 {
-    auto const avg_kernel_time = std::chrono::duration_cast<std::chrono::microseconds>( kernel_cost ).count() / double(loop_t);
     auto const avg_time = std::chrono::duration_cast<std::chrono::microseconds>( end_t - start_t ).count() / double(loop_t);
-    std::cout << "Average kernel running time  = " << avg_kernel_time << " us" << std::endl;
     std::cout << "Average total running time  = " << avg_time << " us" << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
-    unsigned loop_times = 10;
+    unsigned loop_times = 5;
     unsigned num_vertices = 0;
     if(argc >= 4)
     {

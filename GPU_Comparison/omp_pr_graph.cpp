@@ -10,12 +10,12 @@
 #include <omp.h>
 #include "Graph.hpp"
 
+#define CheckTolerance 0
 using namespace CSC586C::soa_graph;
 
 extern const double damping_factor = 0.85;
 extern const unsigned max_iterations = 100;
 extern const double tolerance = 1e-10;
-std::chrono::duration<double> kernel_cost(0);
 
 // Read Input (pairs of source and destination links) from file with format:
 // src_index dest_index
@@ -99,7 +99,6 @@ void PageRank(SoA_Graph *graph)
 
         // Iterater all the vertexes and calculate its adjacency function l(pi,pj) of all inward links
         // Update its pagerank value by adding pr_eigenvector from its inward links separately
-        auto start_kernel = std::chrono::steady_clock::now();
         #pragma omp parallel for
         for (unsigned i = 0; i < num_v; i++)
         {
@@ -116,15 +115,16 @@ void PageRank(SoA_Graph *graph)
             // #pragma omp atomic
             graph->hotData.pagerank[i] += (pr_random + pr_dangling);
         }
-        auto end_kernel = std::chrono::steady_clock::now();
-        kernel_cost += (end_kernel - start_kernel);
 
+#ifdef CheckTolerance
         // finish when cur_toleranceor is smaller than tolerance we set
-        // if(ToleranceCheck(num_v, graph->hotData)) 
-        // {
-        //     std::cout << "Iteration time: " << iter << std::endl;
-        //     break;
-        // }
+        if(ToleranceCheck(num_v, graph->hotData)) 
+        {
+            std::cout << "Iteration time: " << iter << std::endl;
+            break;
+        }
+#endif
+
     }
 }
 
@@ -140,9 +140,7 @@ void printFinalResults(SoA_Graph* graph)
 
 void PrintBenchmark(std::chrono::time_point<std::chrono::steady_clock> start_t, std::chrono::time_point<std::chrono::steady_clock> const end_t, const unsigned loop_t)
 {
-    auto const avg_kernel_time = std::chrono::duration_cast<std::chrono::microseconds>( kernel_cost ).count() / double(loop_t);
     auto const avg_time = std::chrono::duration_cast<std::chrono::microseconds>( end_t - start_t ).count() / double(loop_t);
-    std::cout << "Average kernel running time  = " << avg_kernel_time << " us" << std::endl;
     std::cout << "Average total running time  = " << avg_time << " us" << std::endl;
 }
 
