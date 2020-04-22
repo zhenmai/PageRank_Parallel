@@ -10,6 +10,7 @@
 #include <omp.h>
 #include "Graph.hpp"
 
+#define CheckTolerance 0
 using namespace CSC586C::soa_graph;
 
 extern const double damping_factor = 0.85;
@@ -73,7 +74,7 @@ void PageRank(SoA_Graph *graph)
     double init_rank = double(1.0 / num_v);
     double pr_random = (1.0 - damping_factor) / num_v;
 
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (unsigned i = 0; i < num_v; i++)
     {
         graph->hotData.pagerank[i] = init_rank;
@@ -90,7 +91,8 @@ void PageRank(SoA_Graph *graph)
         {
             graph->hotData.pre_pagerank[i] = graph->hotData.pagerank[i];
             graph->hotData.pagerank[i] = 0.0;
-            dangling_pr_sum += graph->hotData.pre_pagerank[i] * (graph->hotData.outgoing_edges_num[i] == 0);
+            dangling_pr_sum += graph->hotData.pre_pagerank[i] * 
+                            (graph->hotData.outgoing_edges_num[i] == 0);
         }
 
         double pr_dangling = damping_factor * dangling_pr_sum / num_v;
@@ -114,12 +116,15 @@ void PageRank(SoA_Graph *graph)
             graph->hotData.pagerank[i] += (pr_random + pr_dangling);
         }
 
+#if CheckTolerance
         // finish when cur_toleranceor is smaller than tolerance we set
         if(ToleranceCheck(num_v, graph->hotData)) 
         {
             std::cout << "Iteration time: " << iter << std::endl;
             break;
         }
+#endif
+
     }
 }
 
@@ -159,6 +164,7 @@ int main(int argc, char *argv[])
             {
                 SoA_Graph graph(num_vertices, input);
                 PageRank(&graph);
+                //printFinalResults(&graph);
             }  
             auto const end_time = std::chrono::steady_clock::now(); 
             PrintBenchmark(start_time, end_time, loop_times);
